@@ -10,17 +10,21 @@ class SuperGlueLightningModel(pl.LightningModule):
         super().__init__()
         self.config = config
         self.model = model
-        self.loss = nn.NLLLoss()
+        self.loss = nn.CrossEntropyLoss()
 
     def forward(self, x):
         x = self.model(x)
         return x
 
     def training_step(self, batch, batch_idx):
-        out = self.model(batch["kpts0"], batch["descs0"], batch["kpts1"], batch["descs1"])
+        kpts0 = batch["kpts0"]
+        desc0 = batch["desc0"]
+        kpts1 = batch["kpts1"]
+        desc1 = batch["desc1"]
+        matches = batch["matches"]
+        predicted_matches = self.model(kpts0, desc0, kpts1, desc1)
 
-        torch.log_softmax(out, dim=2)
-        loss = self.loss(out, targets)
+        loss = self.loss(predicted_matches, matches)
 
         # logging
         self.log('train/loss', loss, on_epoch=True)
@@ -46,7 +50,3 @@ class SuperGlueLightningModel(pl.LightningModule):
             "lr_scheduler": scheduler,
             "monitor": scheduler_config.get("metric_to_monitor", "train/loss"),
         }
-
-    def _parse_keypoints(self, kpts, scores, descriptors):
-        kpts = torch.cat([kpts, scores[..., None]], dim=2)
-        return kpts.permute(0, 2, 1), descriptors.permute(0, 2, 1)

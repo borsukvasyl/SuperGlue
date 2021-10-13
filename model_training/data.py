@@ -78,7 +78,8 @@ class SuperGlueDataset(Dataset):
         min_x, min_y = linear_sum_assignment(dists)
         mask = dists[min_x, min_y] < threshold
         min_x, min_y = min_x[mask], min_y[mask]
-        matches = np.full((num_features,), -1)
+        num_keypoints = len(keypoints_a)
+        matches = np.full((num_keypoints,), num_keypoints)
         for x, y in zip(min_x, min_y):
             matches[x] = y
         return matches
