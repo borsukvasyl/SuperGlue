@@ -9,10 +9,10 @@ from superglue.model import SuperGlue
 
 def train_superglue(config):
     model = SuperGlue(**config["model"])
-    pl_model = SuperGlueLightningModel(model=model, config=config)
-    dataset = SuperGlueDataset.from_config(config["data"])
+    dataset = SuperGlueDataset(**config["data"])
+    pl_model = SuperGlueLightningModel(model=model, dataset=dataset, config=config)
     trainer = get_trainer(config)
-    trainer.fit(pl_model, dataset)
+    trainer.fit(pl_model)
 
 
 def main(config_path: str):

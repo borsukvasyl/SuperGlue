@@ -1,10 +1,11 @@
 import glob
+from typing import Optional
 
 import cv2
 import numpy as np
-from torch.utils.data import Dataset
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
+from torch.utils.data import Dataset
 
 
 def preprocess(kpts, scores, descriptors, img_size):
@@ -14,15 +15,25 @@ def preprocess(kpts, scores, descriptors, img_size):
     kpts = np.transpose(kpts)
     descriptors = descriptors / 255.
     descriptors = np.transpose(descriptors)
-    return kpts, descriptors
+    return kpts.astype(np.float32), descriptors.astype(np.float32)
 
 
 class SuperGlueDataset(Dataset):
-    def __init__(self, image_glob: str, num_features: int = 1024, warping_ratio: float = 0.2):
+    def __init__(
+            self,
+            image_glob: str,
+            warping_ratio: float = 0.2,
+            num_features: int = 1024,
+            num_samples: Optional[int] = None,
+            return_metadata: bool = False,
+    ):
+        self.image_paths = sorted(glob.glob(image_glob))
         self.warping_ratio = warping_ratio
         self.num_features = num_features
-        self.sift = cv2.xfeatures2d.SIFT_create(nfeatures=self.num_features)
-        self.image_paths = sorted(glob.glob(image_glob))
+        self.return_metadata = return_metadata
+        self.sift = cv2.SIFT_create(nfeatures=self.num_features)
+        if num_samples is not None:
+            self.image_paths = self.image_paths[:num_samples]
 
     def __getitem__(self, index):
         orig_image = self.read_image(self.image_paths[index])
@@ -31,30 +42,39 @@ class SuperGlueDataset(Dataset):
         orig_features = self.get_features(orig_image, num_features=self.num_features)
         warped_features = self.get_features(warped_image, num_features=self.num_features)
         projected_kpts = self.warp_keypoints(orig_features["kpts"], transform_matrix)
-        matches = self.get_matches(projected_kpts, warped_features["kpts"], num_features=self.num_features)
+        matches = self.get_matches(projected_kpts, warped_features["kpts"])
 
         img_size = orig_image.shape[:2]
-        kpts0, desc0 = preprocess(orig_features["kpts"], orig_features["scores"], orig_features["descs"], img_size)
-        kpts1, desc1 = preprocess(warped_features["kpts"], warped_features["scores"], warped_features["descs"], img_size)
+        kpts0, desc0 = preprocess(
+            orig_features["kpts"], orig_features["scores"], orig_features["descs"], img_size
+        )
+        kpts1, desc1 = preprocess(
+            warped_features["kpts"], warped_features["scores"], warped_features["descs"], img_size
+        )
 
-        return dict(
+        outputs = dict(
             kpts0=kpts0,
             desc0=desc0,
             kpts1=kpts1,
             desc1=desc1,
-
-            orig_image=orig_image,
-            orig_kpts=orig_features["kpts"],
-            orig_descs=orig_features["descs"],
-            orig_scores=orig_features["scores"],
-            warped_kpts=warped_features["kpts"],
-            warped_descs=warped_features["descs"],
-            warped_scores=warped_features["scores"],
-            warped_image=warped_image,
-            projected_kpts=projected_kpts,
-            transform_matrix=transform_matrix,
-            matches=matches
+            matches=matches,
         )
+        if self.return_metadata:
+            outputs.update(
+                dict(
+                    orig_image=orig_image,
+                    orig_kpts=orig_features["kpts"],
+                    orig_descs=orig_features["descs"],
+                    orig_scores=orig_features["scores"],
+                    warped_kpts=warped_features["kpts"],
+                    warped_descs=warped_features["descs"],
+                    warped_scores=warped_features["scores"],
+                    warped_image=warped_image,
+                    projected_kpts=projected_kpts,
+                    transform_matrix=transform_matrix,
+                )
+            )
+        return outputs
 
     def __len__(self):
         return len(self.image_paths)
@@ -71,17 +91,20 @@ class SuperGlueDataset(Dataset):
         )
 
     @staticmethod
-    def get_matches(
-            keypoints_a: np.array, keypoints_b: np.array, threshold: float = 3., num_features: int = 64
-    ) -> np.array:
+    def get_matches(keypoints_a: np.array, keypoints_b: np.array, threshold: float = 3.) -> np.array:
         dists = cdist(keypoints_a, keypoints_b)
         min_x, min_y = linear_sum_assignment(dists)
         mask = dists[min_x, min_y] < threshold
         min_x, min_y = min_x[mask], min_y[mask]
-        num_keypoints = len(keypoints_a)
-        matches = np.full((num_keypoints,), num_keypoints)
-        for x, y in zip(min_x, min_y):
-            matches[x] = y
+
+        num_keypoints_a = len(keypoints_a)
+        num_keypoints_b = len(keypoints_b)
+        unmatched_x = np.setdiff1d(np.arange(num_keypoints_a), min_x)
+        unmatched_y = np.setdiff1d(np.arange(num_keypoints_b), min_y)
+        matches = np.zeros((num_keypoints_a + 1, num_keypoints_b + 1))
+        matches[min_x, min_y] = 1
+        matches[-1, unmatched_y] = 1
+        matches[unmatched_x, -1] = 1
         return matches
 
     @staticmethod
@@ -107,11 +130,3 @@ class SuperGlueDataset(Dataset):
         image = cv2.imread(path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return image
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(
-            image_glob=config["image_glob"],
-            num_features=config.get("num_features", 1024),
-            warping_ratio=config.get("warping_ratio", 0.2)
-        )

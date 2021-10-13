@@ -1,16 +1,16 @@
 import torch
 import pytorch_lightning as pl
-import torch.nn as nn
 from pytorch_toolbelt.optimization.functional import get_optimizable_parameters
 from torch import optim
+from torch.utils.data import DataLoader
 
 
 class SuperGlueLightningModel(pl.LightningModule):
-    def __init__(self, model, config):
+    def __init__(self, model, dataset, config):
         super().__init__()
         self.config = config
         self.model = model
-        self.loss = nn.CrossEntropyLoss()
+        self.dataset = dataset
 
     def forward(self, x):
         x = self.model(x)
@@ -24,11 +24,18 @@ class SuperGlueLightningModel(pl.LightningModule):
         matches = batch["matches"]
         predicted_matches = self.model(kpts0, desc0, kpts1, desc1)
 
-        loss = self.loss(predicted_matches, matches)
+        loss = -(torch.log_softmax(predicted_matches, dim=1) * matches).mean()
 
         # logging
         self.log('train/loss', loss, on_epoch=True)
         return loss
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            dataset=self.dataset,
+            batch_size=self.config["batch_size"],
+            shuffle=True,
+        )
 
     def configure_optimizers(self):
         # get optimizer

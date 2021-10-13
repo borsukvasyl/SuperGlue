@@ -1,5 +1,5 @@
 # specifies path where to save models and logs
-experiment_path: GlueNet
+experiment_path: SuperGlue
 
 # model config
 model:
@@ -15,6 +15,7 @@ data:
   image_glob: /datasets/tracking/coco2017/train2017/*
   num_features: 1024
   warping_ratio: 0.2
+  num_samples: 3000
 
 # optimizer and scheduler configs
 optimizer:
@@ -32,7 +33,7 @@ metric_mode: min
 
 # trainer
 gpus: [0, 1]
-min_epochs: 10
-max_epochs: 80
+min_epochs: 80
+max_epochs: 200
 progress_bar_refresh_rate: 1
-batch_size: 8
+batch_size: 1

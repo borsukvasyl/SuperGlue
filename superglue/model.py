@@ -60,6 +60,11 @@ class MultiplexGraphNode(nn.Module):
         residual = self.mlp(torch.cat([src, message], dim=1))
         return src + residual
 
+    def cross_forward(self, src, tgt):
+        message = self.attention(tgt, src)
+        residual = self.mlp(torch.cat([src, message], dim=1))
+        return src + residual
+
 
 class MultiplexGraphNeuralNetwork(nn.Module):
     def __init__(self, descriptors_dim: int, num_heads: int, num_layers: int):
@@ -76,8 +81,8 @@ class MultiplexGraphNeuralNetwork(nn.Module):
                 x_b = attention(x_b, x_b)
             else:
                 # cross attention
-                x_a = attention(x_a, x_b)
-                x_b = attention(x_b, x_a)
+                x_a = attention.cross_forward(x_a, x_b)
+                x_b = attention.cross_forward(x_b, x_a)
         return x_a, x_b
 
 
