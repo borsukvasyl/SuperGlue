@@ -3,6 +3,8 @@ from typing import List
 import torch
 import torch.nn as nn
 
+from superglue.sinkhorn import log_optimal_transport
+
 
 class MLP(nn.Sequential):
     def __init__(self, input_dim: int, hidden_dims: List[int], out_dim: int):
@@ -40,7 +42,10 @@ class AttentionalAggregation(nn.Module):
         )
 
     def forward(self, src, tgt):
-        res = self.attention(src.permute(2, 0, 1), tgt.permute(2, 0, 1))
+        # (B, D, N) -> (N, B, D)
+        src, tgt = src.permute(2, 0, 1), tgt.permute(2, 0, 1)
+        res = self.attention(src, tgt)
+        # (N, B, D) -> (B, D, N)
         return res.permute(1, 2, 0)
 
 
@@ -83,12 +88,16 @@ class SuperGlue(nn.Module):
         descriptors_dim: int,
         hidden_dims: List[int],
         num_heads: int,
-        num_layers: int
+        num_layers: int,
+        sinkhorn_iterations: int,
     ):
         super().__init__()
         self.keypoints_encoder = KeypointEncoder(positions_dim, descriptors_dim, hidden_dims)
         self.graph = MultiplexGraphNeuralNetwork(descriptors_dim, num_heads, num_layers)
         self.final_fc = MLP(descriptors_dim, [], descriptors_dim)
+
+        self.sinkhorn_iterations = sinkhorn_iterations
+        self.sinkhorn_alpha = nn.Parameter(torch.Tensor([1.0]))
 
     def forward(self, kpts0, desc0, kpts1, desc1):
         embs0 = self.keypoints_encoder(kpts0, desc0)
@@ -98,4 +107,7 @@ class SuperGlue(nn.Module):
 
         embs0 = self.final_fc(embs0)
         embs1 = self.final_fc(embs1)
-        return embs0, embs1
+
+        score_matrix = torch.einsum("bdn,bdm->bnm", embs0, embs1)
+        score_matrix = log_optimal_transport(score_matrix, self.sinkhorn_alpha, self.sinkhorn_iterations)
+        return score_matrix
