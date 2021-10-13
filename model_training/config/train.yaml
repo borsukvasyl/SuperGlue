@@ -1,0 +1,38 @@
+# specifies path where to save models and logs
+experiment_path: GlueNet
+
+# model config
+model:
+  positions_dim: 3
+  descriptors_dim: 128
+  hidden_dims: [32, 64, 128, 256]
+  num_heads: 4
+  num_layers: 18
+  sinkhorn_iterations: 100
+
+# datasets
+data:
+  image_glob: /datasets/tracking/coco2017/train2017/*
+  num_features: 1024
+  warping_ratio: 0.2
+
+# optimizer and scheduler configs
+optimizer:
+  lr: 0.0001
+scheduler:
+  metric_to_monitor: train/loss
+  metric_mode: min
+  patience: 5
+  factor: 0.5
+  min_lr: 0.000001
+
+# checkpoint callback
+metric_to_monitor: train/loss
+metric_mode: min
+
+# trainer
+gpus: [0, 1]
+min_epochs: 10
+max_epochs: 80
+progress_bar_refresh_rate: 1
+batch_size: 8
