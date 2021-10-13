@@ -100,6 +100,15 @@ class SuperGlue(nn.Module):
         self.sinkhorn_alpha = nn.Parameter(torch.Tensor([1.0]))
 
     def forward(self, kpts0, desc0, kpts1, desc1):
+        """
+        Args:
+            kpts0: (B, K, N)
+            desc0: (B, D, N)
+            kpts1: (B, K, M)
+            desc1: (B, D, M)
+        Returns:
+            Score matrix of shape (B, N, M)
+        """
         embs0 = self.keypoints_encoder(kpts0, desc0)
         embs1 = self.keypoints_encoder(kpts1, desc1)
 
