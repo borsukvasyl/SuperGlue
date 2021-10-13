@@ -1,5 +1,4 @@
 import glob
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -24,18 +23,18 @@ class SuperGlueDataset(Dataset):
             image_glob: str,
             warping_ratio: float = 0.2,
             num_features: int = 1024,
-            num_samples: Optional[int] = None,
             return_metadata: bool = False,
     ):
         self.image_paths = sorted(glob.glob(image_glob))
         self.warping_ratio = warping_ratio
         self.num_features = num_features
         self.return_metadata = return_metadata
-        self.sift = cv2.SIFT_create(nfeatures=self.num_features)
-        if num_samples is not None:
-            self.image_paths = self.image_paths[:num_samples]
+        self.sift = None
 
     def __getitem__(self, index):
+        if self.sift is None:
+            self.sift = cv2.SIFT_create(nfeatures=self.num_features)
+
         orig_image = self.read_image(self.image_paths[index])
         transform_matrix = self.get_transformation_matrix(shape=orig_image.shape, warping_ratio=self.warping_ratio)
         warped_image = self.warp_image(orig_image, transform_matrix)

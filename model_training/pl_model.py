@@ -24,7 +24,7 @@ class SuperGlueLightningModel(pl.LightningModule):
         matches = batch["matches"]
         predicted_matches = self.model(kpts0, desc0, kpts1, desc1)
 
-        loss = -(torch.log_softmax(predicted_matches, dim=1) * matches).mean()
+        loss = -(torch.log_softmax(predicted_matches, dim=1) * matches).sum() / matches.sum()
 
         # logging
         self.log('train/loss', loss, on_epoch=True)
