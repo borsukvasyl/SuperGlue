@@ -1,3 +1,4 @@
+import os
 from typing import Tuple
 
 import numpy as np
@@ -22,7 +23,7 @@ def preprocess_keypoints(
 
 class SuperGlueMatcher:
     def __init__(self, jit_path: str):
-        self.model = torch.jit.load(jit_path, map_location="cpu")
+        self.model = self._load_model(jit_path)
 
     def match(self, dets0: Detections, dets1: Detections, img0_size: Tuple[int, int], img1_size: Tuple[int, int]):
         kpts0, desc0 = preprocess_keypoints(dets0.kpts, dets0.desc, dets0.meta, img0_size)
@@ -40,3 +41,9 @@ class SuperGlueMatcher:
         mask = (x < kpts0.shape[2]) & (y < kpts1.shape[2])
         x, y = x[mask], y[mask]
         return x, y
+
+    @staticmethod
+    def _load_model(jit_path: str) -> torch.jit.ScriptModule:
+        lib_path = os.path.dirname(__file__)
+        path = os.path.join(lib_path, "checkpoints", jit_path)
+        return torch.jit.load(path, map_location="cpu")
