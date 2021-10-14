@@ -6,49 +6,45 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from torch.utils.data import Dataset
 
-
-def preprocess(kpts, scores, descriptors, img_size):
-    height, width = img_size
-    kpts = (kpts - (width / 2, height / 2)) / max(width, height)
-    kpts = np.concatenate([kpts, scores[..., None]], axis=1)
-    kpts = np.transpose(kpts)
-    descriptors = descriptors / 255.
-    descriptors = np.transpose(descriptors)
-    return kpts.astype(np.float32), descriptors.astype(np.float32)
+from superglue.detectors import SIFTDetector
+from superglue.superglue import preprocess_keypoints
 
 
 class SuperGlueDataset(Dataset):
     def __init__(
-            self,
-            image_glob: str,
-            warping_ratio: float = 0.2,
-            num_features: int = 1024,
-            return_metadata: bool = False,
+        self,
+        image_glob: str,
+        warping_ratio: float = 0.2,
+        num_features: int = 1024,
+        return_metadata: bool = False,
     ):
         self.image_paths = sorted(glob.glob(image_glob))
         self.warping_ratio = warping_ratio
         self.num_features = num_features
         self.return_metadata = return_metadata
-        self.sift = None
+        self.detector = None
 
     def __getitem__(self, index):
-        if self.sift is None:
-            self.sift = cv2.SIFT_create(nfeatures=self.num_features)
+        if self.detector is None:
+            self.detector = SIFTDetector(self.num_features)
 
+        # read image and transform it
         orig_image = self.read_image(self.image_paths[index])
         transform_matrix = self.get_transformation_matrix(shape=orig_image.shape, warping_ratio=self.warping_ratio)
         warped_image = self.warp_image(orig_image, transform_matrix)
-        orig_features = self.get_features(orig_image, num_features=self.num_features)
-        warped_features = self.get_features(warped_image, num_features=self.num_features)
-        projected_kpts = self.warp_keypoints(orig_features["kpts"], transform_matrix)
-        matches = self.get_matches(projected_kpts, warped_features["kpts"])
+
+        # detect and match keypoints
+        orig_features = self.detector.detect(orig_image)
+        warped_features = self.detector.detect(warped_image)
+        projected_kpts = self.warp_keypoints(orig_features.kpts, transform_matrix)
+        matches = self.get_matches(projected_kpts, warped_features.kpts)
 
         img_size = orig_image.shape[:2]
-        kpts0, desc0 = preprocess(
-            orig_features["kpts"], orig_features["scores"], orig_features["descs"], img_size
+        kpts0, desc0 = preprocess_keypoints(
+            orig_features.kpts, orig_features.desc, orig_features.meta, img_size
         )
-        kpts1, desc1 = preprocess(
-            warped_features["kpts"], warped_features["scores"], warped_features["descs"], img_size
+        kpts1, desc1 = preprocess_keypoints(
+            warped_features.kpts, warped_features.desc, warped_features.meta, img_size
         )
 
         outputs = dict(
@@ -62,12 +58,12 @@ class SuperGlueDataset(Dataset):
             outputs.update(
                 dict(
                     orig_image=orig_image,
-                    orig_kpts=orig_features["kpts"],
-                    orig_descs=orig_features["descs"],
-                    orig_scores=orig_features["scores"],
-                    warped_kpts=warped_features["kpts"],
-                    warped_descs=warped_features["descs"],
-                    warped_scores=warped_features["scores"],
+                    orig_kpts=orig_features.kpts,
+                    orig_descs=orig_features.desc,
+                    orig_scores=orig_features.meta,
+                    warped_kpts=warped_features.kpts,
+                    warped_descs=warped_features.desc,
+                    warped_scores=warped_features.meta,
                     warped_image=warped_image,
                     projected_kpts=projected_kpts,
                     transform_matrix=transform_matrix,
@@ -77,17 +73,6 @@ class SuperGlueDataset(Dataset):
 
     def __len__(self):
         return len(self.image_paths)
-
-    def get_features(self, image: np.array, num_features: int):
-        keypoints, descriptors = self.sift.detectAndCompute(image, None)
-        keypoints, descriptors = keypoints[:num_features], descriptors[:num_features]
-        keypoints_value = np.array([(kp.pt[0], kp.pt[1]) for kp in keypoints])
-        keypoints_score = np.array([kp.response for kp in keypoints])
-        return dict(
-            kpts=keypoints_value,
-            scores=keypoints_score,
-            descs=descriptors
-        )
 
     @staticmethod
     def get_matches(keypoints_a: np.array, keypoints_b: np.array, threshold: float = 3.) -> np.array:
