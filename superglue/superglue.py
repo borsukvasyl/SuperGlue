@@ -7,14 +7,17 @@ from scipy.optimize import linear_sum_assignment
 from superglue.detectors import Detections
 
 
-def preprocess_keypoints(kpts: np.ndarray, desc: np.ndarray, meta: np.ndarray, img_size: Tuple[int, int]):
+def preprocess_keypoints(
+        kpts: np.ndarray, desc: np.ndarray, meta: np.ndarray, img_size: Tuple[int, int], normalize: bool = False
+) -> Tuple[np.ndarray, np.ndarray]:
     height, width = img_size
     kpts = (kpts - (width / 2, height / 2)) / max(width, height)
     kpts = np.concatenate([kpts, meta], axis=1)
     kpts = np.transpose(kpts)
-    descriptors = desc / 255.
-    descriptors = np.transpose(descriptors)
-    return kpts.astype(np.float32), descriptors.astype(np.float32)
+    if normalize:
+        desc = desc / 255.
+    desc = np.transpose(desc)
+    return kpts.astype(np.float32), desc.astype(np.float32)
 
 
 class SuperGlueMatcher:

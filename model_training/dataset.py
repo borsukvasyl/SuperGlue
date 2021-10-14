@@ -6,8 +6,12 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from torch.utils.data import Dataset
 
-from superglue.detectors import SIFTDetector
+from model_training.utils import create_logger
+from superglue.detectors import SIFTDetector, DoGHardNetDetector
 from superglue.superglue import preprocess_keypoints
+
+
+logger = create_logger("Dataset")
 
 
 class SuperGlueDataset(Dataset):
@@ -25,9 +29,17 @@ class SuperGlueDataset(Dataset):
         self.detector = None
 
     def __getitem__(self, index):
+        # distributed training fix
         if self.detector is None:
-            self.detector = SIFTDetector(self.num_features)
+            self.detector = DoGHardNetDetector(self.num_features)
 
+        try:
+            return self.get(index)
+        except Exception as e:
+            logger.error(f"Failed to get {index}: {e}")
+            return self.get(0)
+
+    def get(self, index):
         # read image and transform it
         orig_image = self.read_image(self.image_paths[index])
         transform_matrix = self.get_transformation_matrix(shape=orig_image.shape, warping_ratio=self.warping_ratio)

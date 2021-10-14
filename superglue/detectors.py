@@ -27,8 +27,8 @@ class SIFTDetector(BaseDetector):
 
     def detect(self, img: np.ndarray) -> Detections:
         keypoints, descriptors = self.sift.detectAndCompute(img, None)
-        if keypoints is None or descriptors is None:
-            return Detections(kpts=np.zeros((0, 2)), desc=np.zeros((0, 128)), meta=np.zeros((0, 1)))
+        # if keypoints is None or descriptors is None:
+        #     return Detections(kpts=np.zeros((0, 2)), desc=np.zeros((0, 128)), meta=np.zeros((0, 1)))
 
         keypoints, descriptors = keypoints[:self.num_features], descriptors[:self.num_features]
         kpts = np.array([(kp.pt[0], kp.pt[1]) for kp in keypoints])
