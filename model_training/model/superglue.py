@@ -3,7 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from model_training.sinkhorn import log_optimal_transport
+from model_training.model.sinkhorn import log_optimal_transport
 
 
 class MLP(nn.Sequential):

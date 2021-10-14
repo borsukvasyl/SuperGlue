@@ -1,5 +1,5 @@
-import torch
 import pytorch_lightning as pl
+import torch
 from pytorch_toolbelt.optimization.functional import get_optimizable_parameters
 from torch import optim
 from torch.utils.data import DataLoader

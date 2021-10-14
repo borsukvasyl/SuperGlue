@@ -1,10 +1,10 @@
 from fire import Fire
 
 from model_training.dataset import SuperGlueDataset
-from model_training.pl_model import SuperGlueLightningModel
-from model_training.trainer import get_trainer
-from model_training.utils import load_yaml
+from model_training.lightning.pl_model import SuperGlueLightningModel
+from model_training.lightning.trainer import get_trainer
 from model_training.model import SuperGlue
+from model_training.utils import load_yaml
 
 
 def train_superglue(config):
