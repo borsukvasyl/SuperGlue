@@ -13,7 +13,8 @@ def log_sinkhorn_iterations(z, log_mu, log_nu, iterations: int):
 def log_optimal_transport(scores: torch.Tensor, alpha: torch.Tensor, iterations: int) -> torch.Tensor:
     """ Perform Differentiable Optimal Transport in Log-space for stability"""
     b, m, n = scores.shape
-    ms, ns = scores.new_tensor(m), scores.new_tensor(n)
+    ms = torch.tensor(m, dtype=scores.dtype, device=scores.device)
+    ns = torch.tensor(n, dtype=scores.dtype, device=scores.device)
 
     bins0 = alpha.expand(b, m, 1)
     bins1 = alpha.expand(b, 1, n)
