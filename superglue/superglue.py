@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
 
+from superglue.detectors import Detections
+
 
 def preprocess_keypoints(kpts: np.ndarray, desc: np.ndarray, meta: np.ndarray, img_size: Tuple[int, int]):
     height, width = img_size
@@ -19,12 +21,19 @@ class SuperGlueMatcher:
     def __init__(self, jit_path: str):
         self.model = torch.jit.load(jit_path, map_location="cpu")
 
-    def match(self, kpts0: np.ndarray, desc0: np.ndarray, kpts1: np.ndarray, desc1: np.ndarray):
+    def match(self, dets0: Detections, dets1: Detections, img0_size: Tuple[int, int], img1_size: Tuple[int, int]):
+        kpts0, desc0 = preprocess_keypoints(dets0.kpts, dets0.desc, dets0.meta, img0_size)
+        kpts1, desc1 = preprocess_keypoints(dets1.kpts, dets1.desc, dets1.meta, img1_size)
+
         kpts0 = torch.from_numpy(kpts0)[None]
         desc0 = torch.from_numpy(desc0)[None]
         kpts1 = torch.from_numpy(kpts1)[None]
         desc1 = torch.from_numpy(desc1)[None]
-        scores = self.model(kpts0, desc0, kpts1, desc1)
-        scores_numpy = scores.numpy()[0]
-        x, y = linear_sum_assignment(scores_numpy, maximize=True)
+
+        with torch.no_grad():
+            scores = self.model(kpts0, desc0, kpts1, desc1)
+
+        x, y = linear_sum_assignment(scores.numpy()[0], maximize=True)
+        mask = (x < kpts0.shape[2]) & (y < kpts1.shape[2])
+        x, y = x[mask], y[mask]
         return x, y
