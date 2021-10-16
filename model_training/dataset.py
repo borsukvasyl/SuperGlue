@@ -4,10 +4,11 @@ import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
+from numpy.random import randint
 from torch.utils.data import Dataset
 
 from model_training.utils import create_logger
-from superglue.detectors import SIFTDetector, DoGHardNetDetector
+from superglue.detectors import DoGHardNetDetector
 from superglue.superglue import preprocess_keypoints
 
 
@@ -18,7 +19,7 @@ class SuperGlueDataset(Dataset):
     def __init__(
         self,
         image_glob: str,
-        warping_ratio: float = 0.2,
+        warping_ratio: float = 0.25,
         num_features: int = 1024,
         return_metadata: bool = False,
     ):
@@ -87,6 +88,29 @@ class SuperGlueDataset(Dataset):
         return len(self.image_paths)
 
     @staticmethod
+    def get_transformation_matrix(shape: np.array, warping_ratio: float) -> np.array:
+        height, width = shape[:2]
+        corners = np.array([[0, 0], [width, 0], [width, height], [0, height]], dtype=np.float32)
+        warping_value = warping_ratio * (height * width) ** 0.5
+        warp = np.array([
+            [randint(0, warping_value), randint(0, warping_value)],
+            [randint(-warping_value, 0), randint(0, warping_value)],
+            [randint(-warping_value, 0), randint(-warping_value, 0)],
+            [randint(0, warping_value), randint(-warping_value, 0)],
+        ], dtype=np.float32)
+        transform_matrix = cv2.getPerspectiveTransform(corners + warp, corners)
+        return transform_matrix
+
+    @staticmethod
+    def warp_image(image: np.array, transform_matrix: np.array) -> np.array:
+        warped_image = cv2.warpPerspective(src=image, M=transform_matrix, dsize=(image.shape[1], image.shape[0]))
+        return warped_image
+
+    @staticmethod
+    def warp_keypoints(keypoints: np.array, transform_matrix: np.array) -> np.array:
+        return cv2.perspectiveTransform(keypoints.reshape((1, -1, 2)), transform_matrix)[0]
+
+    @staticmethod
     def get_matches(keypoints_a: np.array, keypoints_b: np.array, threshold: float = 3.) -> np.array:
         dists = cdist(keypoints_a, keypoints_b)
         min_x, min_y = linear_sum_assignment(dists)
@@ -102,24 +126,6 @@ class SuperGlueDataset(Dataset):
         matches[-1, unmatched_y] = 1
         matches[unmatched_x, -1] = 1
         return matches
-
-    @staticmethod
-    def get_transformation_matrix(shape: np.array, warping_ratio: float) -> np.array:
-        height, width = shape[:2]
-        corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
-        warping_value = warping_ratio * (height * width) ** 0.5
-        warp = np.random.randint(-warping_value, warping_value, size=(4, 2)).astype(np.float32)
-        transform_matrix = cv2.getPerspectiveTransform(corners, corners + warp)
-        return transform_matrix
-
-    @staticmethod
-    def warp_image(image: np.array, transform_matrix: np.array) -> np.array:
-        warped_image = cv2.warpPerspective(src=image, M=transform_matrix, dsize=(image.shape[1], image.shape[0]))
-        return warped_image
-
-    @staticmethod
-    def warp_keypoints(keypoints: np.array, transform_matrix: np.array) -> np.array:
-        return cv2.perspectiveTransform(keypoints.reshape((1, -1, 2)), transform_matrix)[0]
 
     @staticmethod
     def read_image(path: str) -> np.array:
