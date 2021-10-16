@@ -22,8 +22,9 @@ def preprocess_keypoints(
 
 
 class SuperGlueMatcher:
-    def __init__(self, jit_path: str):
+    def __init__(self, jit_path: str, confidence_thr: float = 0.5):
         self.model = self._load_model(jit_path)
+        self.confidence_thr = confidence_thr
 
     def match(self, dets0: Detections, dets1: Detections, img0_size: Tuple[int, int], img1_size: Tuple[int, int]):
         kpts0, desc0 = preprocess_keypoints(dets0.kpts, dets0.desc, dets0.meta, img0_size)
@@ -36,11 +37,12 @@ class SuperGlueMatcher:
 
         with torch.no_grad():
             scores = self.model(kpts0, desc0, kpts1, desc1)
+        scores = scores.exp().numpy()[0]
 
-        x, y = linear_sum_assignment(scores.numpy()[0], maximize=True)
-        mask = (x < kpts0.shape[2]) & (y < kpts1.shape[2])
+        x, y = linear_sum_assignment(scores, maximize=True)
+        mask = (x < kpts0.shape[2]) & (y < kpts1.shape[2]) & (scores[x, y] > self.confidence_thr)
         x, y = x[mask], y[mask]
-        return x, y
+        return x, y, scores
 
     @staticmethod
     def _load_model(jit_path: str) -> torch.jit.ScriptModule:
