@@ -22,7 +22,7 @@ def visualize(
     kpts1 = kpts1.copy()
     kpts1[:, 0] += img0.shape[1]
 
-    fig = plt.figure(figsize=(20, 20))
+    fig = plt.figure(figsize=(20, 10))
     plt.imshow(vis)
     for x, y in zip(min_x, min_y):
         plt.plot([kpts0[x][0], kpts1[y][0]], [kpts0[x][1], kpts1[y][1]])

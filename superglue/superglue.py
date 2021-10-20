@@ -22,7 +22,7 @@ def preprocess_keypoints(
 
 
 class SuperGlueMatcher:
-    def __init__(self, jit_path: str = "SuperGlue-DogHardNet-60000steps.pt", confidence_thr: float = 0.5):
+    def __init__(self, jit_path: str = "SuperGlue-DoGHardNet-60000steps.pt", confidence_thr: float = 0.5):
         self.model = self._load_model(jit_path)
         self.confidence_thr = confidence_thr
 
