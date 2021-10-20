@@ -1,3 +1,4 @@
+albumentations==1.1.0
 extract-patches==0.1.31
 fire==0.4.0
 kornia==0.5.11

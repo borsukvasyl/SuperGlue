@@ -1,5 +1,6 @@
 import glob
 
+import albumentations as A
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -10,7 +11,6 @@ from torch.utils.data import Dataset
 from model_training.utils import create_logger
 from superglue.detectors import DoGHardNetDetector
 from superglue.superglue import preprocess_keypoints
-
 
 logger = create_logger("Dataset")
 
@@ -28,6 +28,18 @@ class SuperGlueDataset(Dataset):
         self.num_features = num_features
         self.return_metadata = return_metadata
         self.detector = None
+        self.augmentations = A.Compose([
+            A.OneOf(
+                [
+                    A.GaussNoise(),
+                    A.GaussianBlur(),
+                    A.MotionBlur(),
+                ],
+                p=0.2),
+            A.RandomBrightnessContrast(p=0.2),
+            A.RandomGamma(p=0.2),
+            A.HueSaturationValue(p=0.2),
+        ])
 
     def __getitem__(self, index):
         # distributed training fix
@@ -52,13 +64,15 @@ class SuperGlueDataset(Dataset):
         projected_kpts = self.warp_keypoints(orig_features.kpts, transform_matrix)
         matches = self.get_matches(projected_kpts, warped_features.kpts)
 
-        img_size = orig_image.shape[:2]
         kpts0, desc0 = preprocess_keypoints(
-            orig_features.kpts, orig_features.desc, orig_features.meta, img_size
+            orig_features.kpts, orig_features.desc, orig_features.meta, orig_image.shape[:2]
         )
         kpts1, desc1 = preprocess_keypoints(
-            warped_features.kpts, warped_features.desc, warped_features.meta, img_size
+            warped_features.kpts, warped_features.desc, warped_features.meta, warped_image.shape[:2]
         )
+
+        if kpts0.shape[1] <= 1 or kpts1.shape[1] <= 1:
+            raise ValueError("Insufficient number of keypoints")
 
         outputs = dict(
             kpts0=kpts0,
@@ -103,8 +117,10 @@ class SuperGlueDataset(Dataset):
 
     @staticmethod
     def warp_image(image: np.array, transform_matrix: np.array) -> np.array:
-        warped_image = cv2.warpPerspective(src=image, M=transform_matrix, dsize=(image.shape[1], image.shape[0]))
-        return warped_image
+        return cv2.warpPerspective(src=image, M=transform_matrix, dsize=(image.shape[1], image.shape[0]))
+
+    def augment_image(self, image: np.ndarray) -> np.ndarray:
+        return self.augmentations(image=image)["image"]
 
     @staticmethod
     def warp_keypoints(keypoints: np.array, transform_matrix: np.array) -> np.array:
