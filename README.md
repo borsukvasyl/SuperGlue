@@ -35,7 +35,11 @@ For example, if you run demo script with these test images:
 ![alt text](imgs/img0.png) |  ![alt text](imgs/img1.png)
 
 you should get the following result:
-![alt text](imgs/result.png)
+![alt text](imgs/superglue_result.png)
+
+Also, you can run SMNN matcher on the same images by passing `--do_smnn=True`.
+You'll get the following results, which are much worse than SuperGlue
+![alt text](imgs/smnn_result.png)
 
 ## Run training
 You can launch training with default configuration with the following command from the project root directory:
