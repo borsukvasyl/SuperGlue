@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -17,8 +18,10 @@ def visualize(
     detections0: Detections,
     detections1: Detections,
     min_x: np.ndarray,
-    min_y: np.ndarray
+    min_y: np.ndarray,
+    rect: np.ndarray,
 ) -> plt.Figure:
+    img1 = cv2.polylines(img1, [np.int32(rect)], True, (255, 0, 0), 3, cv2.LINE_AA)
     vis = np.hstack([img0, img1])
 
     kpts0 = detections0.kpts
@@ -42,6 +45,22 @@ def smnn(dets0: Detections, dets1: Detections) -> Tuple[np.ndarray, np.ndarray]:
     return min_x, min_y
 
 
+def ransac(
+    img0: np.ndarray,
+    detections0: Detections,
+    detections1: Detections,
+    min_x: np.ndarray,
+    min_y: np.ndarray
+):
+    src_pts = detections0.kpts[min_x]
+    dst_pts = detections1.kpts[min_y]
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 1.0, 0.999, 10000)
+    h, w, _ = img0.shape
+    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
+    rectangle = cv2.perspectiveTransform(pts, H)
+    return rectangle
+
+
 def main(img0_path: str, img1_path: str, save_path: str, confidence_thr: float = 0.1, do_smnn: bool = False) -> None:
     detector = DoGHardNetDetector(1024)
     matcher = SuperGlueMatcher(confidence_thr=confidence_thr)
@@ -57,8 +76,11 @@ def main(img0_path: str, img1_path: str, save_path: str, confidence_thr: float =
         title = "SuperGlue"
         min_x, min_y, _ = matcher.match(detections0, detections1, img0.shape[:2], img1.shape[:2])
 
-    fig = visualize(img0, img1, detections0, detections1, min_x, min_y)
-    fig.suptitle(title)
+    rect = ransac(img0, detections0, detections1, min_x, min_y)
+
+    fig = visualize(img0, img1, detections0, detections1, min_x, min_y, rect)
+    fig.suptitle(title, fontsize=24)
+    plt.tight_layout()
     fig.savefig(save_path)
 
 
