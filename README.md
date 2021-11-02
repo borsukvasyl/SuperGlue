@@ -9,7 +9,7 @@ The second one computes the score matrix with dustbins and finds optimal partial
 
 ## Pretrained models
 This repository provides two pretrained models:
-- [SuperGlue-DoGHardNet-60000steps.pt](https://github.com/borsukvasyl/SuperGlue/blob/master/superglue/checkpoints/SuperGlue-DoGHardNet-60000steps.pt) - 
+- [SuperGlue-DoGHardNet-200000steps.pt](https://github.com/borsukvasyl/SuperGlue/blob/master/superglue/checkpoints/SuperGlue-DoGHardNet-200000steps.pt) - 
   pretrained model for keypoints detected with OpenCV SIFT (DoG detector) and HardNet descriptors
 - [SuperGlue-SIFT-50000steps.pt](https://github.com/borsukvasyl/SuperGlue/blob/master/superglue/checkpoints/SuperGlue-SIFT-50000steps.pt) - 
   model pretrained on OpenCV SIFT keypoints and descriptors
