@@ -1,11 +1,11 @@
 from typing import Tuple
 
-import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from fire import Fire
-import numpy as np
-import matplotlib.pyplot as plt
 from kornia.feature import match_smnn
+from skimage.io import imread
 
 from superglue.detectors import DoGHardNetDetector, Detections
 from superglue.superglue import SuperGlueMatcher
@@ -45,8 +45,8 @@ def smnn(dets0: Detections, dets1: Detections) -> Tuple[np.ndarray, np.ndarray]:
 def main(img0_path: str, img1_path: str, save_path: str, confidence_thr: float = 0.1, do_smnn: bool = False) -> None:
     detector = DoGHardNetDetector(1024)
     matcher = SuperGlueMatcher(confidence_thr=confidence_thr)
-    img0 = cv2.cvtColor(cv2.imread(img0_path), cv2.COLOR_BGR2RGB)
-    img1 = cv2.cvtColor(cv2.imread(img1_path), cv2.COLOR_BGR2RGB)
+    img0 = imread(img0_path)[..., :3]
+    img1 = imread(img1_path)[..., :3]
 
     detections0 = detector.detect(img0)
     detections1 = detector.detect(img1)
