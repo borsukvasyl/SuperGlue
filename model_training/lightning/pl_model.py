@@ -38,22 +38,29 @@ class SuperGlueLightningModel(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        # get optimizer
         optimizer_config = self.config["optimizer"]
         params = get_optimizable_parameters(self.model)
         optimizer = torch.optim.Adam(params, lr=optimizer_config.get("lr", 1e-4))
 
-        # get scheduler
-        scheduler_config = self.config["scheduler"]
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode=self.config.get("metric_mode", "min"),
-            patience=scheduler_config["patience"],
-            factor=scheduler_config["factor"],
-            min_lr=scheduler_config["min_lr"],
-        )
+        scheduler = self._get_scheduler(optimizer)
         return {
             "optimizer": optimizer,
             "lr_scheduler": scheduler,
-            "monitor": scheduler_config.get("metric_to_monitor", "train/loss"),
+            "monitor": self.config["scheduler"].get("metric_to_monitor", "train/loss"),
         }
+
+    def _get_scheduler(self, optimizer):
+        scheduler_config = self.config["scheduler"]
+        scheduler_name = scheduler_config.get("name", "plateau")
+        if scheduler_name == "plateau":
+            return optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode=self.config.get("metric_mode", "min"),
+                patience=scheduler_config["patience"],
+                factor=scheduler_config["factor"],
+                min_lr=scheduler_config["min_lr"],
+            )
+        elif scheduler_name == "exponential":
+            return optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_config["gamma"])
+        else:
+            raise ValueError(f"Invalid scheduler [{scheduler_name}]")

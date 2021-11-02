@@ -1,0 +1,38 @@
+# specifies path where to save models and logs
+experiment_path: SuperGlue
+
+# model config
+model:
+  positions_dim: 3
+  descriptors_dim: 128
+  hidden_dims: [32, 64, 128, 256]
+  num_heads: 4
+  num_layers: 18
+  sinkhorn_iterations: 100
+
+checkpoint: ""
+
+# datasets
+data:
+  image_glob: /home/vasyl/work/tmp/superglue/paris/*/*
+  num_features: 1024
+  warping_ratio: 0.25
+
+# optimizer and scheduler configs
+optimizer:
+  lr: 0.0001
+scheduler:
+  name: exponential
+  gamma: 0.999998
+
+# checkpoint callback
+metric_to_monitor: train/loss
+metric_mode: min
+
+# trainer
+gpus: [0, 1]
+min_epochs: 80
+max_epochs: 200
+#train_percent: 3000
+progress_bar_refresh_rate: 1
+batch_size: 1
